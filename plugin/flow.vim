@@ -26,7 +26,7 @@ function! <SID>FlowCoverageRefresh()
   let covered = get(expressions, 'covered_count')
   let uncovered = get(expressions, 'uncovered_count')
   let total = covered + uncovered
-  let percent = (covered / str2float(total)) * 100.0
+  let percent = total > 0 ? ((covered / str2float(total)) * 100.0) : 0.0
 
   let b:flow_coverage_status = printf('%.2f%% (%d/%d)', percent, covered, total)
 
