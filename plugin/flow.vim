@@ -1,24 +1,26 @@
-
 function! s:FlowCoverageHide()
-  for match in getmatches()
-    if stridx(match['group'], 'FlowCoverage') == 0
-      call matchdelete(match['id'])
-    endif
-  endfor
+  if exists('w:current_highlights')
+    for l:highlight in w:current_highlights
+      call matchdelete(l:highlight)
+    endfor
+  endif
+  let w:current_highlights = []
+  let w:highlights_drawn = 0
 endfunction
 
 function! GetLine(line)
   return [ get(a:line, 'line'), get(a:line, 'column') ]
 endfunction
 
-function! <SID>FlowCoverageRefresh()
-  let command = 'flow coverage ' . fnameescape(expand('%')) . ' --from vim --json 2> /dev/null'
+function! s:FlowCoverageRefresh()
+  let filename = fnameescape(expand('%'))
+  let command = 'flow coverage ' . filename . ' --from vim --json 2> /dev/null'
 
   let result = system(command)
 
   if v:shell_error == 1 || v:shell_error == 3 || len(result) == 0
     let b:flow_coverage_status = ''
-    return 0
+    return
   endif
 
   let json_result = json_decode(result)
@@ -29,11 +31,19 @@ function! <SID>FlowCoverageRefresh()
   let percent = total > 0 ? ((covered / str2float(total)) * 100.0) : 0.0
 
   let b:flow_coverage_status = printf('%.2f%% (%d/%d)', percent, covered, total)
+  let b:flow_coverage_uncovered_locs = get(expressions, 'uncovered_locs')
+
+  call s:FlowCoverageShowHighlights()
+endfunction
+
+function! s:FlowCoverageShowHighlights()
+  if !exists('b:flow_coverage_uncovered_locs')
+    call s:FlowCoverageRefresh()
+  endif
 
   call s:FlowCoverageHide()
 
-  let loclist = []
-  for line in get(expressions, 'uncovered_locs')
+  for line in b:flow_coverage_uncovered_locs
     let start = get(line, 'start')
     let end = get(line, 'end')
     let [line_start, col_start] = GetLine(start)
@@ -45,7 +55,6 @@ function! <SID>FlowCoverageRefresh()
       let positions = []
       for each_line in range(line_start, line_end)
         if each_line == line_start
-          " TODO: to end of line?
           let each_pos = [each_line, col_start, 100]
         elseif each_line == line_end
           let each_pos = [each_line, 1, col_end]
@@ -57,20 +66,25 @@ function! <SID>FlowCoverageRefresh()
       endfor
     endif
 
-    call matchaddpos('FlowCoverage', positions)
-    call add(loclist, {
-          \ 'lnum': line_start,
-          \ 'col': col_start,
-          \ 'text': 'Not covered by Flow',
-          \ 'valid': 1,
-          \ 'type': 'W',
-          \})
+    call add(w:current_highlights, matchaddpos('FlowCoverage', positions))
   endfor
-
-  call setloclist(0, loclist)
+  let w:highlights_drawn = 1
 endfunction
+
+function! s:FlowCoverageToggleHighlight()
+  if !exists('w:highlights_drawn')
+    return
+  endif
+  if w:highlights_drawn
+    call s:FlowCoverageHide()
+  else
+    call s:FlowCoverageShowHighlights()
+  endif
+endfunction
+
+command FlowCoverageToggle call s:FlowCoverageToggleHighlight()
 
 highlight link FlowCoverage SpellCap
 
 au BufLeave *.js call s:FlowCoverageHide()
-au BufWritePost,BufReadPost,BufEnter *.js call <SID>FlowCoverageRefresh()
+au BufWritePost,BufReadPost,BufEnter *.js call s:FlowCoverageRefresh()
