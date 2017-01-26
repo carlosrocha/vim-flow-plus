@@ -110,10 +110,8 @@ function! s:FindRefs()
 endfunction
 
 function! s:NextRef(delta)
-  " TODO: refresh refs
-  if !exists('b:flow_current_refs')
-    call s:FindRefs()
-  endif
+  " TODO: cache refs
+  call s:FindRefs()
 
   let offset = line2byte(line('.')) + col('.') - 2
   let idx = BinarySearch(offset, b:flow_current_refs)
