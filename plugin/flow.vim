@@ -1,3 +1,6 @@
+
+let w:flow_coverage_highlight_enabled = 1
+
 function! s:FlowCoverageHide()
   if exists('w:current_highlights')
     for l:highlight in w:current_highlights
@@ -33,7 +36,9 @@ function! s:FlowCoverageRefresh()
   let b:flow_coverage_status = printf('%.2f%% (%d/%d)', percent, covered, total)
   let b:flow_coverage_uncovered_locs = get(expressions, 'uncovered_locs')
 
-  call s:FlowCoverageShowHighlights()
+  if w:flow_coverage_highlight_enabled
+    call s:FlowCoverageShowHighlights()
+  endif
 endfunction
 
 function! s:FlowCoverageShowHighlights()
@@ -75,9 +80,11 @@ function! s:FlowCoverageToggleHighlight()
   if !exists('w:highlights_drawn')
     return
   endif
-  if w:highlights_drawn
+  if w:highlights_drawn && w:flow_coverage_highlight_enabled
+    let w:flow_coverage_highlight_enabled = 0
     call s:FlowCoverageHide()
   else
+    let w:flow_coverage_highlight_enabled = 1
     call s:FlowCoverageShowHighlights()
   endif
 endfunction
