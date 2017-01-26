@@ -1,3 +1,7 @@
+if exists('g:loaded_flow_coverage')
+  finish
+endif
+let g:loaded_flow_coverage = 1
 
 let w:flow_coverage_highlight_enabled = 1
 
@@ -15,9 +19,11 @@ function! GetLine(line)
   return [ get(a:line, 'line'), get(a:line, 'column') ]
 endfunction
 
+let s:flow_flags = ' --from vim --json --no-auto-start --timeout 1 --strip-root'
+
 function! s:FlowCoverageRefresh()
   let filename = fnameescape(expand('%'))
-  let command = 'flow coverage ' . filename . ' --from vim --json 2> /dev/null'
+  let command = 'flow coverage ' . filename . s:flow_flags
 
   let result = system(command)
 
@@ -76,7 +82,7 @@ function! s:FlowCoverageShowHighlights()
   let w:highlights_drawn = 1
 endfunction
 
-function! s:FlowCoverageToggleHighlight()
+function! s:ToggleHighlight()
   if !exists('w:highlights_drawn')
     return
   endif
@@ -89,7 +95,68 @@ function! s:FlowCoverageToggleHighlight()
   endif
 endfunction
 
-command FlowCoverageToggle call s:FlowCoverageToggleHighlight()
+function! s:FindRefs()
+  let pos = line('.') . ' ' . col('.')
+  let filename = fnameescape(expand('%')) . ' ' . pos
+  let command = 'flow find-refs ' . filename . ' ' . s:flow_flags
+
+  let result = system(command)
+
+  if v:shell_error == 1 || v:shell_error == 3 || len(result) == 0
+    return
+  endif
+
+  let b:flow_current_refs = json_decode(result)
+endfunction
+
+function! s:NextRef(delta)
+  " TODO: refresh refs
+  if !exists('b:flow_current_refs')
+    call s:FindRefs()
+  endif
+
+  let offset = line2byte(line('.')) + col('.') - 2
+  let idx = BinarySearch(offset, b:flow_current_refs)
+
+  if idx > -1
+    let next_ref_idx = float2nr(fmod(idx + (a:delta), len(b:flow_current_refs)))
+    let next_ref = get(b:flow_current_refs, next_ref_idx)
+    let next_ref_start = get(next_ref, 'start')
+    let [line, column] = GetLine(next_ref_start)
+
+    call cursor(line, column)
+  else
+    echom 'Flow: No references found'
+  endif
+endfunction
+
+function! BinarySearch(value, list)
+  let min_index = 0
+  let max_index = len(a:list) - 1
+
+  while min_index <= max_index
+    let curr_index = float2nr((min_index + max_index) / 2)
+    let curr_el = get(a:list, curr_index)
+    let start = get(curr_el, 'start')
+    let end = get(curr_el, 'end')
+    let offset_start = get(start, 'offset')
+    let offset_end = get(end, 'offset')
+
+    if offset_start <= a:value && offset_end >= a:value
+      return curr_index
+    elseif offset_start < a:value
+      let min_index = curr_index + 1
+    else
+      let max_index = curr_index - 1
+    endif
+  endwhile
+
+  return -1
+endfunction
+
+command FlowCoverageToggle call s:ToggleHighlight()
+command FlowNextRef call s:NextRef(1)
+command FlowPrevRef call s:NextRef(-1)
 
 highlight link FlowCoverage SpellCap
 
