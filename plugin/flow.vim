@@ -152,9 +152,9 @@ function! BinarySearch(value, list)
   return -1
 endfunction
 
-command FlowCoverageToggle call s:ToggleHighlight()
-command FlowNextRef call s:NextRef(1)
-command FlowPrevRef call s:NextRef(-1)
+command! FlowCoverageToggle call s:ToggleHighlight()
+command! FlowNextRef call s:NextRef(1)
+command! FlowPrevRef call s:NextRef(-1)
 
 highlight link FlowCoverage SpellCap
 
