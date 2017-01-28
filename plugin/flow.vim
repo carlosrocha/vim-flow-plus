@@ -22,10 +22,9 @@ endfunction
 let s:flow_flags = ' --from vim --json --no-auto-start --timeout 1 --strip-root'
 
 function! s:FlowCoverageRefresh()
-  let filename = fnameescape(expand('%'))
-  let command = 'flow coverage ' . filename . s:flow_flags
-
-  let result = system(command)
+  let command = 'flow coverage ' . s:flow_flags
+  let stdin = getline(1, '$')
+  let result = system(command, stdin)
 
   if v:shell_error == 1 || v:shell_error == 3 || len(result) == 0
     let b:flow_coverage_status = ''
@@ -96,11 +95,9 @@ function! s:ToggleHighlight()
 endfunction
 
 function! s:FindRefs()
-  let pos = line('.') . ' ' . col('.')
-  let filename = fnameescape(expand('%')) . ' ' . pos
-  let command = 'flow find-refs ' . filename . ' ' . s:flow_flags
-
-  let result = system(command)
+  let command = 'flow find-refs ' . line('.') . ' ' . col('.') . s:flow_flags
+  let stdin = getline(1, '$')
+  let result = system(command, stdin)
 
   if v:shell_error == 1 || v:shell_error == 3 || len(result) == 0
     return
