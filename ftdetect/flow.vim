@@ -1,1 +1,1 @@
-au BufNewFile,BufRead *.flow set filetype=javascript
+au BufNewFile,BufRead *.flow setlocal filetype=javascript
