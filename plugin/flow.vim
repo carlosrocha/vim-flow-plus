@@ -1,3 +1,5 @@
+" vint: -ProhibitImplicitScopeVariable
+
 if exists('g:loaded_flow_coverage')
   finish
 endif
@@ -19,14 +21,15 @@ function! GetLine(line)
   return [ get(a:line, 'line'), get(a:line, 'column') ]
 endfunction
 
-let s:flow_flags = ' --from vim --json --no-auto-start --timeout 1 --strip-root'
+let g:flow#flowpath = 'flow'
+let g:flow#flags = ' --from vim --json --no-auto-start --strip-root'
 
 function! s:FlowCoverageRefresh()
-  let command = 'flow coverage ' . s:flow_flags
+  let command = g:flow#flowpath . ' coverage ' . g:flow#flags
   let stdin = getline(1, '$')
   let result = system(command, stdin)
 
-  if v:shell_error == 1 || v:shell_error == 3 || len(result) == 0
+  if v:shell_error > 0 || empty(result)
     let b:flow_coverage_status = ''
     return
   endif
@@ -34,8 +37,7 @@ function! s:FlowCoverageRefresh()
   let json_result = json_decode(result)
   let expressions = get(json_result, 'expressions')
   let covered = get(expressions, 'covered_count')
-  let uncovered = get(expressions, 'uncovered_count')
-  let total = covered + uncovered
+  let total = covered + get(expressions, 'uncovered_count')
   let percent = total > 0 ? ((covered / str2float(total)) * 100.0) : 0.0
 
   let b:flow_coverage_status = printf('%.2f%% (%d/%d)', percent, covered, total)
@@ -54,10 +56,8 @@ function! s:FlowCoverageShowHighlights()
   call s:FlowCoverageHide()
 
   for line in b:flow_coverage_uncovered_locs
-    let start = get(line, 'start')
-    let end = get(line, 'end')
-    let [line_start, col_start] = GetLine(start)
-    let [line_end, col_end] = GetLine(end)
+    let [line_start, col_start] = GetLine(get(line, 'start'))
+    let [line_end, col_end] = GetLine(get(line, 'end'))
 
     if line_start == line_end
       let positions = [[line_start, col_start, col_end - col_start + 1]]
@@ -94,48 +94,66 @@ function! s:ToggleHighlight()
   endif
 endfunction
 
-function! s:FindRefs()
-  let command = 'flow find-refs ' . line('.') . ' ' . col('.') . s:flow_flags
-  let stdin = getline(1, '$')
-  let result = system(command, stdin)
+function! s:FindRefs(pos) abort
+  if exists('b:flow_current_refs')
+    unlet b:flow_current_refs
+  endif
 
-  if v:shell_error == 1 || v:shell_error == 3 || len(result) == 0
+  let command = g:flow#flowpath . ' find-refs ' . a:pos . g:flow#flags
+  let result = system(command, getline(1, '$'))
+
+  if v:shell_error > 0 || empty(result)
+    if v:shell_error == 6
+      echom 'Flow: Server not running'
+    endif
     return
   endif
 
   let b:flow_current_refs = json_decode(result)
 endfunction
 
-function! s:NextRef(delta)
-  " TODO: cache refs
-  call s:FindRefs()
+function! s:NextRef(delta) abort
+  let pos = line('.') . ' ' . col('.')
 
+  if !exists('b:flow_refs_last_jump') || pos != b:flow_refs_last_jump ||
+        \ !exists('b:flow_current_refs')
+    call s:FindRefs(pos)
+    if !exists('b:flow_current_refs')
+      return
+    endif
+  endif
+
+  let refs_len = len(b:flow_current_refs)
   let offset = line2byte(line('.')) + col('.') - 2
-  let idx = BinarySearch(offset, b:flow_current_refs)
+  let idx = Search(offset, b:flow_current_refs)
 
   if idx > -1
-    let next_ref_idx = float2nr(fmod(idx + (a:delta), len(b:flow_current_refs)))
+    let next_ref_idx = idx + (a:delta)
+    if next_ref_idx < 0 || next_ref_idx >= refs_len
+      let next_ref_idx = float2nr(fmod(next_ref_idx, refs_len))
+    endif
+
     let next_ref = get(b:flow_current_refs, next_ref_idx)
     let next_ref_start = get(next_ref, 'start')
     let [line, column] = GetLine(next_ref_start)
 
+    " Save last jump to reuse the refs
+    let b:flow_refs_last_jump = line . ' ' . column
     call cursor(line, column)
   else
     echom 'Flow: No references found'
   endif
 endfunction
 
-function! BinarySearch(value, list)
+function! Search(value, list)
   let min_index = 0
   let max_index = len(a:list) - 1
 
   while min_index <= max_index
     let curr_index = float2nr((min_index + max_index) / 2)
     let curr_el = get(a:list, curr_index)
-    let start = get(curr_el, 'start')
-    let end = get(curr_el, 'end')
-    let offset_start = get(start, 'offset')
-    let offset_end = get(end, 'offset')
+    let offset_start = get(curr_el['start'], 'offset')
+    let offset_end = get(curr_el['end'], 'offset')
 
     if offset_start <= a:value && offset_end >= a:value
       return curr_index
