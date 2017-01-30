@@ -124,6 +124,11 @@ function! s:NextRef(delta) abort
   endif
 
   let refs_len = len(b:flow_current_refs)
+  if refs_len == 0
+    echom 'Flow: Current position is not a reference'
+    return
+  endif
+
   let offset = line2byte(line('.')) + col('.') - 2
   let idx = Search(offset, b:flow_current_refs)
 
@@ -143,6 +148,45 @@ function! s:NextRef(delta) abort
   else
     echom 'Flow: No references found'
   endif
+endfunction
+
+function! s:RenameRef()
+  let pos = line('.') . ' ' . col('.')
+  call s:FindRefs(pos)
+
+  if !exists('b:flow_current_refs')
+    return
+  endif
+
+  if empty(b:flow_current_refs)
+    echom 'Flow: Current position is not a reference'
+    return
+  endif
+
+  let rename_to = input('Flow: New ref name: ')
+  if rename_to !~ '^[A-Za-z_\$][A-Za-z_\$0-9]*$'
+    echo ' '
+    echom 'Flow: Not a valid ref'
+    return
+  endif
+
+  for ref in b:flow_current_refs
+    let start = get(ref, 'start')
+    let end = get(ref, 'end')
+    let line = get(start, 'line')
+    let linestr = getline(line)
+
+    if start['column'] - 1
+      let pre = linestr[:(start['column'] - 2)]
+      let post = linestr[(end['column']):]
+      let new_line = pre . rename_to . post
+    else
+      let post = linestr[(end['column']):]
+      let new_line = rename_to . post
+    endif
+
+    call setline(line, new_line)
+  endfor
 endfunction
 
 function! Search(value, list)
@@ -170,6 +214,7 @@ endfunction
 command! FlowCoverageToggle call s:ToggleHighlight()
 command! FlowNextRef call s:NextRef(1)
 command! FlowPrevRef call s:NextRef(-1)
+command! FlowRenameRef call s:RenameRef()
 
 highlight link FlowCoverage SpellCap
 
