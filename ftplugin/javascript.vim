@@ -171,13 +171,12 @@ function! Search(value, list)
   return -1
 endfunction
 
-function! s:FlowTypeAtPos()
+function! s:TypeAtPos()
   let pos = line('.') . ' ' . col('.')
   let command = g:flow#flowpath . ' type-at-pos ' . pos . g:flow#flags
   let result = system(command, getline(1, '$'))
 
   if v:shell_error > 0 || empty(result)
-    let b:flow_coverage_status = ''
     return
   endif
 
@@ -185,10 +184,32 @@ function! s:FlowTypeAtPos()
   echo json_result['type']
 endfunction
 
+function! s:GetDefAtPos()
+  let pos = line('.') . ' ' . col('.')
+  let command = g:flow#flowpath . ' get-def ' . pos . g:flow#flags
+  let result = system(command, getline(1, '$'))
+
+  if v:shell_error > 0 || empty(result)
+    return
+  endif
+
+  let def = json_decode(result)
+  let path = def['path']
+  if empty(path)
+    echom 'Flow: No definition found'
+  elseif path =~ '-$'
+    call cursor(def['line'], def['start'])
+  elseif filereadable(path)
+    execute 'edit' path
+    call cursor(def['line'], def['start'])
+  endif
+endfunction
+
 command! FlowCoverageToggle call s:ToggleHighlight()
 command! FlowNextRef call s:NextRef(1)
 command! FlowPrevRef call s:NextRef(-1)
-command! FlowTypeAtPos call s:FlowTypeAtPos()
+command! FlowTypeAtPos call s:TypeAtPos()
+command! FlowGetDef call s:GetDefAtPos()
 
 highlight link FlowCoverage SpellCap
 
