@@ -1,30 +1,30 @@
-" vint: -ProhibitImplicitScopeVariable
-
 if exists('g:loaded_flow_coverage')
   finish
 endif
-let g:loaded_flow_coverage = 1
 
-let w:flow_coverage_highlight_enabled = 1
+let g:loaded_flow_coverage = 1
+let g:flow#flowpath = 'flow'
+let g:flow#flags = ' --from vim --json --no-auto-start --strip-root'
 
 function! s:FlowCoverageHide()
-  if exists('w:current_highlights')
-    for l:highlight in w:current_highlights
-      call matchdelete(l:highlight)
-    endfor
-  endif
-  let w:current_highlights = []
-  let w:highlights_drawn = 0
+  for match in getmatches()
+    if stridx(match['group'], 'FlowCoverage') == 0
+      call matchdelete(match['id'])
+    endif
+  endfor
+
+  let b:flow_highlights_drawn = 0
 endfunction
 
 function! GetLine(line)
   return [ get(a:line, 'line'), get(a:line, 'column') ]
 endfunction
 
-let g:flow#flowpath = 'flow'
-let g:flow#flags = ' --from vim --json --no-auto-start --strip-root'
-
 function! s:FlowCoverageRefresh()
+  if !exists('b:flow_coverage_highlight_enabled')
+    let b:flow_coverage_highlight_enabled = 1
+  endif
+
   let command = g:flow#flowpath . ' coverage ' . g:flow#flags
   let stdin = getline(1, '$')
   let result = system(command, stdin)
@@ -43,7 +43,7 @@ function! s:FlowCoverageRefresh()
   let b:flow_coverage_status = printf('%.2f%% (%d/%d)', percent, covered, total)
   let b:flow_coverage_uncovered_locs = get(expressions, 'uncovered_locs')
 
-  if w:flow_coverage_highlight_enabled
+  if b:flow_coverage_highlight_enabled
     call s:FlowCoverageShowHighlights()
   endif
 endfunction
@@ -76,20 +76,20 @@ function! s:FlowCoverageShowHighlights()
       endfor
     endif
 
-    call add(w:current_highlights, matchaddpos('FlowCoverage', positions))
+    call matchaddpos('FlowCoverage', positions)
   endfor
-  let w:highlights_drawn = 1
+  let b:flow_highlights_drawn = 1
 endfunction
 
 function! s:ToggleHighlight()
-  if !exists('w:highlights_drawn')
+  if !exists('b:flow_highlights_drawn')
     return
   endif
-  if w:highlights_drawn && w:flow_coverage_highlight_enabled
-    let w:flow_coverage_highlight_enabled = 0
+  if b:flow_highlights_drawn && b:flow_coverage_highlight_enabled
+    let b:flow_coverage_highlight_enabled = 0
     call s:FlowCoverageHide()
   else
-    let w:flow_coverage_highlight_enabled = 1
+    let b:flow_coverage_highlight_enabled = 1
     call s:FlowCoverageShowHighlights()
   endif
 endfunction
