@@ -26,8 +26,7 @@ function! s:FlowCoverageRefresh()
   endif
 
   let command = g:flow#flowpath . ' coverage ' . g:flow#flags
-  let stdin = getline(1, '$')
-  let result = system(command, stdin)
+  let result = system(command, getline(1, '$'))
 
   if v:shell_error > 0 || empty(result)
     let b:flow_coverage_status = ''
@@ -172,9 +171,24 @@ function! Search(value, list)
   return -1
 endfunction
 
+function! s:FlowTypeAtPos()
+  let pos = line('.') . ' ' . col('.')
+  let command = g:flow#flowpath . ' type-at-pos ' . pos . g:flow#flags
+  let result = system(command, getline(1, '$'))
+
+  if v:shell_error > 0 || empty(result)
+    let b:flow_coverage_status = ''
+    return
+  endif
+
+  let json_result = json_decode(result)
+  echo json_result['type']
+endfunction
+
 command! FlowCoverageToggle call s:ToggleHighlight()
 command! FlowNextRef call s:NextRef(1)
 command! FlowPrevRef call s:NextRef(-1)
+command! FlowTypeAtPos call s:FlowTypeAtPos()
 
 highlight link FlowCoverage SpellCap
 
