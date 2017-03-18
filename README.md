@@ -41,12 +41,15 @@ endfunction
 ```
 
 Result:
-![coverage_statusline](./coverage_statusline.png)
+
+![coverage statusline](./coverage_statusline.png)
 
 ## Commands
 
 ### `FlowCoverageToggle`
 Toggle to highlight uncovered expressions in the current file.
+
+![coverage highlight](./coverage_highlight.png)
 
 ### `FlowPrevRef`
 Go to the next reference of the variable under the cursor.
