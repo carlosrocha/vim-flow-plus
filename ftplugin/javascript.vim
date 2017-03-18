@@ -1,8 +1,8 @@
-if exists('g:loaded_flow_coverage')
+if exists('g:loaded_flow_plus')
   finish
 endif
 
-let g:loaded_flow_coverage = 1
+let g:loaded_flow_plus = 1
 let g:flow#flowpath = 'flow'
 let g:flow#flags = ' --from vim --json --no-auto-start --strip-root'
 
